@@ -3,6 +3,8 @@ import { ref, reactive, computed, watch, onMounted } from 'vue';
 import { api, setUnauthorizedHandler } from './api.js';
 import AccountManager from './components/AccountManager.vue';
 import RecordEditor from './components/RecordEditor.vue';
+import ImportRecords from './components/ImportRecords.vue';
+import { toJsonExport, toCsvExport, downloadText } from './recordIO.js';
 
 // ---- 登录态 ----
 const user = ref(null);
@@ -26,6 +28,8 @@ const loadingRecords = ref(false);
 const search = ref('');
 const showAccount = ref(false);
 const showRecord = ref(false);
+const showImport = ref(false);
+const showExportMenu = ref(false);
 const editingRecord = ref(null);
 const busyId = ref(null);
 const toasts = ref([]);
@@ -325,6 +329,53 @@ function refresh() {
   if (accountId.value) loadItems();
 }
 
+// ---- 导入 / 导出 ----
+function exportRecords(fmt) {
+  showExportMenu.value = false;
+  if (!activeName.value || !filteredRecords.value.length) {
+    toast('当前域名没有可导出的记录', 'error');
+    return;
+  }
+  const stamp = new Date().toISOString().slice(0, 10);
+  if (fmt === 'csv') {
+    downloadText(`${activeName.value}-records-${stamp}.csv`, toCsvExport(filteredRecords.value), 'text/csv');
+  } else {
+    const data = { domain: activeName.value, records: filteredRecords.value };
+    downloadText(`${activeName.value}-records-${stamp}.json`, toJsonExport(data.records, data.domain));
+  }
+  toast(`已导出 ${filteredRecords.value.length} 条记录`);
+}
+
+async function onImportOne(record, resolve, reject) {
+  const payload = { type: record.type, name: record.name, content: record.content };
+  if (isCF.value) {
+    payload.ttl = record.ttl ?? 1;
+    if (['A', 'AAAA', 'CNAME'].includes(record.type)) payload.proxied = record.proxied;
+    if (record.type === 'MX') payload.mx = record.mx ?? 10;
+  } else {
+    payload.ttl = record.ttl ?? 600;
+    payload.line = record.line || '默认';
+    if (record.type === 'MX') payload.mx = record.mx ?? 10;
+  }
+  try {
+    if (isCF.value) await api.cfCreate(accountId.value, activeId.value, payload);
+    else await api.dnsCreate(accountId.value, activeName.value, payload);
+    resolve();
+  } catch (e) {
+    reject(e);
+  }
+}
+
+async function onImportDone() {
+  showImport.value = false;
+  toast('导入完成');
+  await loadRecords();
+}
+
+function closeExportMenu() {
+  showExportMenu.value = false;
+}
+
 onMounted(() => {
   setUnauthorizedHandler(() => {
     user.value = null;
@@ -372,7 +423,7 @@ onMounted(() => {
         <button @click="showAccount = true">🔑 账户</button>
         <button class="ghost" @click="showPwd = true">🔒 改密码</button>
         <span class="user-chip" :title="user?.username">{{ user?.username }}</span>
-        <button class="ghost" @click="doLogout">退出</button>
+              <button class="ghost" @click="doLogout">退出</button>
       </header>
 
       <div class="body">
@@ -410,6 +461,16 @@ onMounted(() => {
           <div class="toolbar">
             <div class="domain-title" v-if="activeName">{{ activeName }}</div>
             <input v-model="search" class="search" placeholder="搜索记录…" />
+            <div class="export-wrap" v-if="activeId" @mouseleave="closeExportMenu">
+              <button :disabled="!filteredRecords.length" @click="showExportMenu = !showExportMenu" title="导出当前域名记录">
+                ⇩ 导出
+              </button>
+              <div v-if="showExportMenu" class="export-menu">
+                <button @click="exportRecords('json')">JSON 格式</button>
+                <button @click="exportRecords('csv')">CSV 格式</button>
+              </div>
+            </div>
+            <button :disabled="!activeId" @click="showImport = true" title="从 JSON/CSV 文件导入记录">⇧ 导入</button>
             <button class="primary" :disabled="!activeId" @click="addRecord">+ 添加记录</button>
           </div>
 
@@ -504,6 +565,15 @@ onMounted(() => {
         @close="showRecord = false"
         @save="onRecordSave"
       />
+
+      <ImportRecords
+        v-if="showImport"
+        :provider="provider"
+        :domain="activeName"
+        @close="showImport = false"
+        @import="onImportOne"
+      />
+
 
       <!-- 修改密码 -->
       <div v-if="showPwd" class="modal-mask" @click.self="showPwd = false">

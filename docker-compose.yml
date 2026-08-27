@@ -1,0 +1,16 @@
+services:
+  xdns:
+    build: .
+    image: xdns:latest
+    container_name: xdns
+    restart: unless-stopped
+    ports:
+      - "3090:3090"
+    environment:
+      # 首次启动时创建 admin 账号的初始密码；不设置则控制台打印随机密码
+      # XDNS_ADMIN_PASSWORD: "change-me"
+      # Node 进程内时区（影响 SQLite datetime('now','localtime')）
+      TZ: Asia/Shanghai
+    volumes:
+      # SQLite 数据库持久化：accounts / users / sessions 都在这里
+      - ./data:/app/data

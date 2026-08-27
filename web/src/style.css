@@ -172,6 +172,31 @@ input::placeholder { color: var(--text-3); }
   margin-right: auto;
 }
 
+/* 导出下拉 */
+.export-wrap { position: relative; }
+.export-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.12);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  min-width: 130px;
+  z-index: 50;
+}
+.export-menu button {
+  border: none;
+  background: transparent;
+  text-align: left;
+  border-radius: 7px;
+  white-space: nowrap;
+}
+.export-menu button:hover { background: var(--primary-weak); color: var(--primary); }
+
 .table-wrap { flex: 1; overflow: auto; padding: 0 20px 20px; }
 table { width: 100%; border-collapse: collapse; background: var(--panel); border-radius: var(--radius); box-shadow: var(--shadow); }
 thead th {
