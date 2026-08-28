@@ -4,9 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>xDNS · DNS 管理平台</title>
+    <script>
+      // 在应用挂载前应用主题，避免暗色模式下白屏闪烁
+      (function () {
+        try {
+          var t = localStorage.getItem('xdns-theme'); // 'light' | 'dark' | null(跟随系统)
+          var dark = t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) document.documentElement.classList.add('dark');
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
   </body>
-</html>
+  </html>

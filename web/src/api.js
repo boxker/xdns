@@ -44,8 +44,11 @@ export const api = {
     request(`/cloudflare/${id}/zones/${zoneId}/records`, { method: 'POST', body: JSON.stringify(r) }),
   cfUpdate: (id, zoneId, rid, r) =>
     request(`/cloudflare/${id}/zones/${zoneId}/records/${rid}`, { method: 'PATCH', body: JSON.stringify(r) }),
-  cfDelete: (id, zoneId, rid) =>
-    request(`/cloudflare/${id}/zones/${zoneId}/records/${rid}`, { method: 'DELETE' }),
+  cfDelete: (id, zoneId, rid, meta) =>
+    request(`/cloudflare/${id}/zones/${zoneId}/records/${rid}`, {
+      method: 'DELETE',
+      body: JSON.stringify(meta || {}),
+    }),
   cfProxy: (id, zoneId, rid, proxied) =>
     request(`/cloudflare/${id}/zones/${zoneId}/records/${rid}/proxy`, {
       method: 'PATCH',
@@ -65,11 +68,22 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(r),
     }),
-  dnsDelete: (id, domain, rid) =>
-    request(`/dnspod/${id}/records/${rid}?domain=${encodeURIComponent(domain)}`, { method: 'DELETE' }),
+  dnsDelete: (id, domain, rid, meta) =>
+    request(`/dnspod/${id}/records/${rid}?domain=${encodeURIComponent(domain)}`, {
+      method: 'DELETE',
+      body: JSON.stringify(meta || {}),
+    }),
   dnsStatus: (id, domain, rid, status) =>
     request(`/dnspod/${id}/records/${rid}/status?domain=${encodeURIComponent(domain)}`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
     }),
+
+  // 工具
+  logs: (limit = 100) => request(`/logs?limit=${limit}`),
+  dnsLookup: (type, name, content) => {
+    const q = new URLSearchParams({ type, name });
+    if (content) q.set('content', content);
+    return request(`/tools/dns-lookup?${q}`);
+  },
 };

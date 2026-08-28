@@ -90,7 +90,7 @@ function remove(acc) {
 
       <div v-if="!editing">
         <div v-if="accounts.length === 0" class="empty" style="padding: 24px">
-          <div class="icon">🔑</div>
+          <div class="icon"><svg viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4"/><path d="M10.3 12.9 21 2m-5.5 1.5 4 4M14 8l2-2"/></svg></div>
           <div class="title">还没有账户</div>
           <div style="font-size: 13px">添加 Cloudflare 或 DNSPod 的 API 凭证开始管理</div>
         </div>
@@ -110,12 +110,18 @@ function remove(acc) {
             </div>
           </div>
           <div class="actions">
-            <button class="icon-btn" title="编辑" @click="startEdit(acc)">✏️</button>
-            <button class="icon-btn danger" title="删除" @click="remove(acc)">🗑️</button>
+            <button class="icon-btn" title="编辑" @click="startEdit(acc)">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5m-1.5-9.5a2.1 2.1 0 0 1 3 3L12 16l-4 1 1-4z"/></svg>
+            </button>
+            <button class="icon-btn danger" title="删除" @click="remove(acc)">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M4 7h16m-2 0-.7 12a2 2 0 0 1-2 1.9H8.7a2 2 0 0 1-2-1.9L6 7m4 0V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2m-5 4v6m4-6v6"/></svg>
+            </button>
           </div>
         </div>
 
-        <button class="primary" style="width: 100%" @click="startCreate">+ 添加账户</button>
+        <button class="primary" style="width: 100%" @click="startCreate">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>添加账户
+        </button>
       </div>
 
       <div v-else>

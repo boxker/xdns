@@ -33,6 +33,17 @@ db.exec(`
     expires_at INTEGER NOT NULL,
     created_at TEXT DEFAULT (datetime('now','localtime'))
   );
+
+  CREATE TABLE IF NOT EXISTS audit_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL,
+    action TEXT NOT NULL,
+    detail TEXT,
+    ip TEXT,
+    created_at TEXT DEFAULT (datetime('now','localtime'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at DESC);
 `);
 
 export function listAccounts() {
@@ -110,4 +121,17 @@ export function deleteSessionsByUser(userId) {
 
 export function deleteExpiredSessions(now) {
   return db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now);
+}
+
+// ---------- 审计日志 ----------
+export function addAuditLog({ username, action, detail = '', ip = '' }) {
+  return db
+    .prepare('INSERT INTO audit_logs (username, action, detail, ip) VALUES (?,?,?,?)')
+    .run(username, action, detail, ip);
+}
+
+export function listAuditLogs(limit = 100) {
+  return db
+    .prepare('SELECT id, username, action, detail, ip, created_at FROM audit_logs ORDER BY id DESC LIMIT ?')
+    .all(Math.min(Math.max(Number(limit) || 100, 1), 500));
 }

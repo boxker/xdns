@@ -117,7 +117,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
           @dragleave="isDragging = false"
           @drop.prevent="onDrop"
         >
-          <div class="dz-icon">📥</div>
+          <div class="dz-icon"><svg viewBox="0 0 24 24" style="width:34px;height:34px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round"><path d="M12 16V4m0 0 4 4m-4-4L8 8M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></div>
           <div class="dz-title">点击选择或拖入文件</div>
           <div class="dz-hint">支持 .json / .csv（TXT 也按 CSV 解析）</div>
         </div>
@@ -130,7 +130,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
       <!-- 预览 -->
       <template v-else-if="state === 'preview'">
         <div class="file-line">
-          <span class="file-name">📄 {{ fileName }}</span>
+          <span class="file-name">{{ fileName }}</span>
           <button class="ghost" @click="reset">重新选择</button>
         </div>
 
@@ -158,7 +158,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
             </thead>
             <tbody>
               <tr v-for="(r, i) in records.slice(0, 100)" :key="i" :class="{ dup: r._dup }">
-                <td><span class="type-badge">{{ r.type }}</span></td>
+                <td><span class="type-badge" :class="'t-' + String(r.type).toLowerCase()">{{ r.type }}</span></td>
                 <td class="mono">{{ r.name }}</td>
                 <td class="mono">{{ r.content }}</td>
                 <td v-if="provider === 'dnspod'">{{ r.line }}</td>
@@ -225,7 +225,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
   background: #fafbfc;
 }
 .drop-zone:hover, .drop-zone.drag { border-color: var(--primary); background: var(--primary-weak); }
-.dz-icon { font-size: 34px; }
+.dz-icon { font-size: 34px; color: var(--text-3); }
 .dz-title { font-weight: 500; margin-top: 8px; color: var(--text); }
 .dz-hint { font-size: 12px; color: var(--text-3); margin-top: 4px; }
 .file-line { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }

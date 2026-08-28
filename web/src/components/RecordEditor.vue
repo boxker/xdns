@@ -113,8 +113,11 @@ function submit() {
         <select v-model.number="form.ttl" :disabled="form.ttlAuto">
           <option v-for="o in CF_TTL_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
         </select>
-        <label style="margin-top: 8px; display: flex; align-items: center; gap: 6px; font-weight: 400">
-          <input type="checkbox" v-model="form.ttlAuto" style="width: auto" /> 自动（跟随默认 TTL）
+        <label style="margin-top: 8px; display: flex; align-items: center; gap: 8px; font-weight: 400; cursor: pointer">
+          <span class="cdn-toggle" :class="{ on: form.ttlAuto }" @click.prevent="form.ttlAuto = !form.ttlAuto">
+            <span class="switch"></span>
+          </span>
+          自动（跟随默认 TTL）
         </label>
       </div>
 
