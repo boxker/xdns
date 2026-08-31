@@ -1,0 +1,74 @@
+name: 构建并推送镜像
+
+# push 到 main → 构建并推送 :latest
+# push v* 标签 → 构建并推送 :版本号 和 :latest
+# 也可在 Gitea 网页端手动触发（workflow_dispatch，推送 :latest）
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: build-push-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: registry-lan.xwww.cc
+  IMAGE_NAME: boxker/xdns
+
+jobs:
+  build-push:
+    name: 构建 & 推送
+    runs-on: ubuntu-latest
+    # 固定 alpine 版 node 镜像（与 runner 默认 label 同一国内代理源）：
+    # 自带 apk，便于安装 docker-cli / git；自带 node 保证兼容 JS action
+    container:
+      image: 6d0e19bc3241483074ce4226a8000714.d.1ms.run/library/node:22-alpine
+    steps:
+      - name: 安装 docker CLI 与 git
+        run: |
+          # apk 默认 CDN 国内访问慢，先切阿里镜像
+          sed -i 's#https\?://dl-cdn.alpinelinux.org#https://mirrors.aliyun.com#g' /etc/apk/repositories
+          apk add --no-cache docker-cli git
+
+      # job 容器在 gitea 网络内，直接用容器名访问实例；
+      # 用每次运行自动生成的 token 克隆，不依赖外部 action 下载
+      - name: 检出代码
+        run: git clone --depth 1 "http://${{ github.actor }}:${{ github.token }}@gitea:3000/${GITHUB_REPOSITORY}.git" .
+
+      - name: 登录镜像仓库
+        run: echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login "$REGISTRY" -u "${{ secrets.REGISTRY_USERNAME || 'admin' }}" --password-stdin
+
+      - name: 计算镜像标签
+        id: meta
+        run: |
+          case "$GITHUB_REF" in
+            refs/tags/v*)
+              VERSION="${GITHUB_REF#refs/tags/v}"
+              TAGS="$REGISTRY/$IMAGE_NAME:$VERSION $REGISTRY/$IMAGE_NAME:latest"
+              ;;
+            *)
+              TAGS="$REGISTRY/$IMAGE_NAME:latest"
+              ;;
+          esac
+          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
+          echo "将构建: $TAGS"
+
+      - name: 构建镜像
+        run: |
+          BUILD_ARGS=""
+          for tag in ${{ steps.meta.outputs.tags }}; do
+            BUILD_ARGS="$BUILD_ARGS -t $tag"
+          done
+          docker build $BUILD_ARGS .
+
+      - name: 推送镜像
+        run: |
+          for tag in ${{ steps.meta.outputs.tags }}; do
+            docker push "$tag"
+          done
+
+      - name: 退出登录
+        if: always()
+        run: docker logout "$REGISTRY"
