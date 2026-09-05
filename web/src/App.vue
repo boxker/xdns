@@ -6,6 +6,7 @@ import RecordEditor from './components/RecordEditor.vue';
 import ImportRecords from './components/ImportRecords.vue';
 import BatchEditRecords from './components/BatchEditRecords.vue';
 import { toJsonExport, toCsvExport, downloadText } from './recordIO.js';
+import { runPool } from './pool.js';
 
 // ---- 服务商定义 ----
 const PROVIDERS = [
@@ -262,24 +263,35 @@ function onBatchEditDone({ ok, failed }) {
 
 // ---- DNS 生效检测 ----
 const CHECKABLE_TYPES = new Set(['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'SRV', 'CAA']);
-async function checkRecord(r) {
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// retried 标记保证限流重试只做一次，避免和后端限流窗口互相等待造成无限重试
+async function checkRecord(r, retried = false) {
   if (!CHECKABLE_TYPES.has(r.type)) {
     toast(`${r.type} 类型暂不支持检测`, 'error');
     return;
   }
-  dnsResults[r.id] = { state: 'checking', matched: null, values: [] };
+  // proxied 字段随结果下发：模板据此区分"已代理"展示语义（可解析/无解析），而非 生效/不一致
+  dnsResults[r.id] = { state: 'checking', matched: null, values: [], proxied: !!r.proxied };
   try {
-    const res = await api.dnsLookup(r.type, r.name, r.content);
-    dnsResults[r.id] = { state: 'done', matched: res.matched, values: res.values || [], error: res.error };
+    // 已代理记录的公网解析返回的是 CDN/边缘节点地址，与源站记录值必然"不一致"造成误报；
+    // 因此 content 传空串，后端不比对（matched=null），只看公网能否解析出 values
+    const res = await api.dnsLookup(r.type, r.name, r.proxied ? '' : r.content);
+    dnsResults[r.id] = { state: 'done', matched: res.matched, values: res.values || [], error: res.error, proxied: !!r.proxied };
   } catch (e) {
-    dnsResults[r.id] = { state: 'done', matched: null, values: [], error: e.message };
+    // 限流错误（提示含"频繁"）：等 5 秒让限流窗口回落，再重试一次
+    if (!retried && e.message && e.message.includes('频繁')) {
+      await sleep(5000);
+      return checkRecord(r, true);
+    }
+    dnsResults[r.id] = { state: 'done', matched: null, values: [], error: e.message, proxied: !!r.proxied };
   }
 }
 async function checkAllRecords() {
   const list = filteredRecords.value.filter((r) => CHECKABLE_TYPES.has(r.type) && !r.locked);
   if (!list.length) return toast('没有可检测的记录', 'error');
   toast(`正在检测 ${list.length} 条记录的公网解析…`);
-  await Promise.all(list.map((r) => checkRecord(r)));
+  // 固定并发 6：整域检测动辄上百条，Promise.all 全量并发会瞬间打爆每分钟限流窗口
+  await runPool(list, 6, checkRecord);
 }
 
 // ---- 复制 / 日志 ----
@@ -1034,6 +1046,15 @@ onMounted(() => {
                   </td>
                   <td>
                     <span v-if="dnsResults[r.id]?.state === 'checking'" class="dns-badge checking">检测中</span>
+                    <!-- 已代理记录：公网返回的是 CDN 节点地址，不与源站配置比对，只区分能否解析，避免"不一致"误报 -->
+                    <span
+                      v-else-if="dnsResults[r.id]?.state === 'done' && dnsResults[r.id].proxied"
+                      class="dns-badge"
+                      :class="(dnsResults[r.id].values || []).length ? 'ok' : 'mismatch'"
+                      :title="((dnsResults[r.id].values || []).join('\n') || dnsResults[r.id].error || '公网未解析到该记录') + '\n经 CDN/边缘代理，公网返回的是代理节点地址，不与源站配置比对'"
+                    >
+                      {{ (dnsResults[r.id].values || []).length ? '已代理 · 可解析' : '已代理 · 无解析' }}
+                    </span>
                     <span
                       v-else-if="dnsResults[r.id]?.state === 'done'"
                       class="dns-badge"
@@ -1101,6 +1122,15 @@ onMounted(() => {
                     <span>TTL {{ zoned && r.ttl === 1 ? '自动' : r.ttl }}</span>
                     <span v-if="!zoned">{{ r.line || '默认' }}</span>
                     <span v-if="dnsResults[r.id]?.state === 'checking'" class="dns-badge checking">检测中</span>
+                    <!-- 已代理记录：公网返回的是 CDN 节点地址，不与源站配置比对，只区分能否解析，避免"不一致"误报 -->
+                    <span
+                      v-else-if="dnsResults[r.id]?.state === 'done' && dnsResults[r.id].proxied"
+                      class="dns-badge"
+                      :class="(dnsResults[r.id].values || []).length ? 'ok' : 'mismatch'"
+                      :title="((dnsResults[r.id].values || []).join('\n') || dnsResults[r.id].error || '公网未解析到该记录') + '\n经 CDN/边缘代理，公网返回的是代理节点地址，不与源站配置比对'"
+                    >
+                      {{ (dnsResults[r.id].values || []).length ? '已代理 · 可解析' : '已代理 · 无解析' }}
+                    </span>
                     <span
                       v-else-if="dnsResults[r.id]?.state === 'done'"
                       class="dns-badge"
@@ -1150,6 +1180,7 @@ onMounted(() => {
         v-if="showImport"
         :provider="provider"
         :domain="activeName"
+        :existing-records="records"
         @close="showImport = false"
         @import="onImportOne"
       />

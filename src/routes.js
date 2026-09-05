@@ -14,9 +14,11 @@ const loginFailures = new Map(); // ip -> { count, resetAt }
 const LOGIN_MAX_FAILURES = 10;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 
-// DNS 检测限流（内存版，防止被当作递归解析代理滥用）：每用户每分钟最多 90 次
+// DNS 检测限流（内存版，防止被当作递归解析代理滥用）：每用户每分钟最多 240 次
+// 上限从 90 提到 240：整域检测（数百条记录、前端并发池限 6）会短时间内集中触发，
+// 检测接口仅登录用户可用且只查公网 DNS，滥用风险低，放宽以支撑整域一键检测
 const lookupWindow = new Map(); // key -> { count, resetAt }
-const LOOKUP_MAX = 90;
+const LOOKUP_MAX = 240;
 const LOOKUP_WINDOW_MS = 60 * 1000;
 
 function clientIp(req) {
