@@ -5,6 +5,7 @@ import AccountManager from './components/AccountManager.vue';
 import RecordEditor from './components/RecordEditor.vue';
 import ImportRecords from './components/ImportRecords.vue';
 import BatchEditRecords from './components/BatchEditRecords.vue';
+import BatchResult from './components/BatchResult.vue';
 import { toJsonExport, toCsvExport, downloadText } from './recordIO.js';
 import { runPool } from './pool.js';
 
@@ -45,6 +46,8 @@ const showAccount = ref(false);
 const showRecord = ref(false);
 const showImport = ref(false);
 const showBatchEdit = ref(false);
+// 批量操作失败明细弹窗：有失败时置 { title, ok, fails }，由 BatchResult 组件展示（U2）
+const batchResult = ref(null);
 const showExportMenu = ref(false);
 const editingRecord = ref(null);
 const busyId = ref(null);
@@ -173,19 +176,26 @@ async function batchDelete() {
   batchBusy.value = true;
   let ok = 0;
   let fail = 0;
-  for (const r of list) {
+  const fails = []; // 收集逐条失败原因（U2：失败明细可见），供 BatchResult 弹窗展示
+  for (let i = 0; i < list.length; i++) {
+    const r = list[i];
     try {
       if (isCF.value) await api.cfDelete(accountId.value, activeId.value, r.id, { type: r.type, name: r.name });
       else if (isESA.value) await api.esaDelete(accountId.value, activeId.value, activeName.value, r.id, { type: r.type, name: r.name });
       else await api.dnsDelete(accountId.value, activeName.value, r.id, { type: r.type, name: r.name });
       ok += 1;
-    } catch {
+    } catch (e) {
       fail += 1;
+      fails.push(`${r.type} ${r.name}: ${e.message}`);
     }
+    // 轻节流：与导入/批量编辑节奏一致，避免请求过快触发服务商限流（最后一条后不多等）
+    if (i < list.length - 1) await new Promise((r2) => setTimeout(r2, 100));
   }
   batchBusy.value = false;
   clearSelection();
-  toast(`批量删除完成：成功 ${ok}${fail ? `，失败 ${fail}` : ''}`, fail ? 'error' : 'success');
+  // 有失败时打开明细弹窗（含逐条原因），全部成功维持原 toast 汇总
+  if (fail > 0) batchResult.value = { title: '批量删除结果', ok, fails };
+  else toast(`批量删除完成：成功 ${ok}`, 'success');
   loadRecords();
 }
 
@@ -195,17 +205,23 @@ async function batchStatus(next) {
   batchBusy.value = true;
   let ok = 0;
   let fail = 0;
-  for (const r of list) {
+  const fails = []; // 同 batchDelete：收集失败原因供明细弹窗展示
+  for (let i = 0; i < list.length; i++) {
+    const r = list[i];
     try {
       await api.dnsStatus(accountId.value, activeName.value, r.id, next);
       ok += 1;
-    } catch {
+    } catch (e) {
       fail += 1;
+      fails.push(`${r.type} ${r.name}: ${e.message}`);
     }
+    if (i < list.length - 1) await new Promise((r2) => setTimeout(r2, 100));
   }
   batchBusy.value = false;
   clearSelection();
-  toast(`批量${next === 'enabled' ? '启用' : '停用'}完成：成功 ${ok}${fail ? `，失败 ${fail}` : ''}`, fail ? 'error' : 'success');
+  const act = next === 'enabled' ? '启用' : '停用';
+  if (fail > 0) batchResult.value = { title: `批量${act}结果`, ok, fails };
+  else toast(`批量${act}完成：成功 ${ok}`, 'success');
   loadRecords();
 }
 
@@ -215,18 +231,24 @@ async function batchProxy(proxied) {
   batchBusy.value = true;
   let ok = 0;
   let fail = 0;
-  for (const r of list) {
+  const fails = []; // 同 batchDelete：收集失败原因供明细弹窗展示
+  for (let i = 0; i < list.length; i++) {
+    const r = list[i];
     try {
       if (isCF.value) await api.cfProxy(accountId.value, activeId.value, r.id, proxied);
       else await api.esaProxy(accountId.value, activeId.value, activeName.value, r.id, proxied);
       ok += 1;
-    } catch {
+    } catch (e) {
       fail += 1;
+      fails.push(`${r.type} ${r.name}: ${e.message}`);
     }
+    if (i < list.length - 1) await new Promise((r2) => setTimeout(r2, 100));
   }
   batchBusy.value = false;
   clearSelection();
-  toast(`批量${proxied ? '开启' : '关闭'}加速完成：成功 ${ok}${fail ? `，失败 ${fail}` : ''}`, fail ? 'error' : 'success');
+  const act = proxied ? '开启' : '关闭';
+  if (fail > 0) batchResult.value = { title: `批量${act}加速结果`, ok, fails };
+  else toast(`批量${act}加速完成：成功 ${ok}`, 'success');
   loadRecords();
 }
 
@@ -1193,6 +1215,15 @@ onMounted(() => {
         @close="showBatchEdit = false"
         @apply="onBatchApply"
         @done="onBatchEditDone"
+      />
+
+      <!-- 批量操作失败明细（有失败时由 batchDelete/batchStatus/batchProxy 置入数据） -->
+      <BatchResult
+        v-if="batchResult"
+        :title="batchResult.title"
+        :ok="batchResult.ok"
+        :fails="batchResult.fails"
+        @close="batchResult = null"
       />
 
 
