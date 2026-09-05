@@ -43,6 +43,7 @@ docker compose up -d
 | `XDNS_SECRET` | 自动生成 | **Token 加密主密钥**，见下方「安全模型」 |
 | `XDNS_TRUST_PROXY` | `loopback` | `1` = 信任所有来源的 `X-Forwarded-For`（跨容器/远程反代时设置）；默认仅信任本机回环代理 |
 | `XDNS_ESA_ENDPOINT` | `esa.cn-hangzhou.aliyuncs.com` | 阿里云 ESA API 端点，国际站账号改为 `esa.ap-southeast-1.aliyuncs.com` |
+| `XDNS_RESOLVERS` | `223.5.5.5,119.29.29.29,1.1.1.1,8.8.8.8` | DNS 生效检测使用的公网递归服务器，逗号分隔 IP |
 | `TZ` | 系统 | 容器时区，影响日志时间戳，建议 `Asia/Shanghai` |
 
 数据全部落在挂载的 `./data` 目录（SQLite 数据库 + 密钥文件），备份该目录即可迁移。
