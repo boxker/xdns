@@ -2,8 +2,19 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="xDNS · 自托管 DNS 管理平台，支持 Cloudflare、DNSPod 与阿里云 ESA" />
     <title>xDNS · DNS 管理平台</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+    <!-- 主题色跟随模式变化，内联脚本与 App.vue 的 applyTheme 会同步更新 -->
+    <meta name="theme-color" content="#f4f5fa" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="xDNS" />
     <script>
       // 在应用挂载前应用主题，避免暗色模式下白屏闪烁
       (function () {
@@ -11,6 +22,8 @@
           var t = localStorage.getItem('xdns-theme'); // 'light' | 'dark' | null(跟随系统)
           var dark = t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches);
           if (dark) document.documentElement.classList.add('dark');
+          var m = document.querySelector('meta[name="theme-color"]');
+          if (m) m.setAttribute('content', dark ? '#0d0e14' : '#f4f5fa');
         } catch (e) {}
       })();
     </script>

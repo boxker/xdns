@@ -79,6 +79,31 @@ export const api = {
       body: JSON.stringify({ status }),
     }),
 
+  // 阿里云 ESA（站点用 siteId 定位，site 参数为站点名，用于记录名展开 FQDN）
+  esaSites: (id) => request(`/aliyun-esa/${id}/sites`),
+  esaRecords: (id, siteId, site) =>
+    request(`/aliyun-esa/${id}/sites/${siteId}/records?site=${encodeURIComponent(site)}`),
+  esaCreate: (id, siteId, site, r) =>
+    request(`/aliyun-esa/${id}/sites/${siteId}/records?site=${encodeURIComponent(site)}`, {
+      method: 'POST',
+      body: JSON.stringify(r),
+    }),
+  esaUpdate: (id, siteId, site, rid, r) =>
+    request(`/aliyun-esa/${id}/sites/${siteId}/records/${rid}?site=${encodeURIComponent(site)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(r),
+    }),
+  esaDelete: (id, siteId, site, rid, meta) =>
+    request(`/aliyun-esa/${id}/sites/${siteId}/records/${rid}?site=${encodeURIComponent(site)}`, {
+      method: 'DELETE',
+      body: JSON.stringify(meta || {}),
+    }),
+  esaProxy: (id, siteId, site, rid, proxied) =>
+    request(`/aliyun-esa/${id}/sites/${siteId}/records/${rid}/proxy?site=${encodeURIComponent(site)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ proxied }),
+    }),
+
   // 工具
   logs: (limit = 100) => request(`/logs?limit=${limit}`),
   dnsLookup: (type, name, content) => {

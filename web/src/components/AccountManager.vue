@@ -15,9 +15,20 @@ const form = reactive({
   auth_type: 'token',
   token: '',
   email: '',
+  akId: '',
+  akSecret: '',
 });
 
-const providerLabel = (p) => (p === 'cloudflare' ? 'Cloudflare' : 'DNSPod');
+const PROVIDERS = [
+  { value: 'cloudflare', label: 'Cloudflare', short: 'CF' },
+  { value: 'dnspod', label: 'DNSPod', short: 'DP' },
+  { value: 'aliyun-esa', label: '阿里云 ESA', short: 'ESA' },
+];
+const badgeClass = (p) => (p === 'cloudflare' ? 'cf' : p === 'dnspod' ? 'dp' : 'esa');
+const providerLabel = (p) => PROVIDERS.find((x) => x.value === p)?.label || p;
+const providerShort = (p) => PROVIDERS.find((x) => x.value === p)?.short || p;
+
+const isESA = computed(() => form.provider === 'aliyun-esa');
 
 function resetForm() {
   form.provider = 'cloudflare';
@@ -25,6 +36,8 @@ function resetForm() {
   form.auth_type = 'token';
   form.token = '';
   form.email = '';
+  form.akId = '';
+  form.akSecret = '';
 }
 
 function startCreate() {
@@ -40,6 +53,8 @@ function startEdit(acc) {
   form.auth_type = acc.auth_type || 'token';
   form.token = '';
   form.email = acc.email || '';
+  form.akId = '';
+  form.akSecret = '';
   formError.value = '';
   editId.value = acc.id;
   editing.value = true;
@@ -52,6 +67,7 @@ function cancel() {
 async function submit() {
   if (!form.name.trim()) return;
   formError.value = '';
+
   if (form.provider === 'dnspod' && form.token) {
     const t = form.token.trim().replace(/，/g, ',').replace(/\s+/g, '');
     if (!/^\d+,[^,\s]+$/.test(t)) {
@@ -59,13 +75,25 @@ async function submit() {
       return;
     }
   }
+
+  let token = form.token;
+  if (isESA.value) {
+    const id = form.akId.trim().replace(/，/g, ',').replace(/\s+/g, '');
+    const secret = form.akSecret.trim().replace(/，/g, ',').replace(/\s+/g, '');
+    if (id && secret) token = `${id},${secret}`;
+    else if (id || secret) {
+      formError.value = 'AccessKeyId 与 AccessKeySecret 需要成对填写；编辑时留空两项表示不修改。';
+      return;
+    }
+  }
+
   saving.value = true;
   const payload = {
     provider: form.provider,
     name: form.name.trim(),
     auth_type: form.provider === 'cloudflare' ? form.auth_type : 'token',
     email: form.email,
-    token: form.token,
+    token,
   };
   emit('save', {
     id: editId.value,
@@ -73,7 +101,7 @@ async function submit() {
     onDone: (ok) => {
       saving.value = false;
       if (ok) editing.value = false;
-      else formError.value = '保存失败，请核对 Token 后重试';
+      else formError.value = '保存失败，请核对凭证后重试';
     },
   });
 }
@@ -92,18 +120,16 @@ function remove(acc) {
         <div v-if="accounts.length === 0" class="empty" style="padding: 24px">
           <div class="icon"><svg viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4"/><path d="M10.3 12.9 21 2m-5.5 1.5 4 4M14 8l2-2"/></svg></div>
           <div class="title">还没有账户</div>
-          <div style="font-size: 13px">添加 Cloudflare 或 DNSPod 的 API 凭证开始管理</div>
+          <div style="font-size: 13px">添加 Cloudflare / DNSPod / 阿里云 ESA 的 API 凭证开始管理</div>
         </div>
 
         <div v-for="acc in accounts" :key="acc.id" class="zone-item" style="border: 1px solid var(--border); margin-bottom: 8px">
           <div style="display: flex; align-items: center; gap: 10px; min-width: 0">
-            <span class="provider-badge" :class="acc.provider === 'cloudflare' ? 'cf' : 'dp'">
-              {{ providerLabel(acc.provider) }}
-            </span>
+            <span class="provider-badge" :class="badgeClass(acc.provider)">{{ providerShort(acc.provider) }}</span>
             <div style="min-width: 0">
               <div style="font-weight: 500">{{ acc.name }}</div>
               <div class="muted" style="font-size: 12px">
-                {{ acc.auth_type === 'key' ? 'Global API Key' : 'API Token' }}
+                {{ acc.provider === 'aliyun-esa' ? 'AccessKey' : acc.auth_type === 'key' ? 'Global API Key' : 'API Token' }}
                 <template v-if="acc.email"> · {{ acc.email }}</template>
                 <div v-if="acc.tokenHint" style="color: var(--danger); margin-top: 4px">{{ acc.tokenHint }}</div>
               </div>
@@ -128,8 +154,7 @@ function remove(acc) {
         <div class="form-row">
           <label>服务商</label>
           <select v-model="form.provider" :disabled="editId !== null">
-            <option value="cloudflare">Cloudflare</option>
-            <option value="dnspod">DNSPod</option>
+            <option v-for="p in PROVIDERS" :key="p.value" :value="p.value">{{ p.label }}</option>
           </select>
         </div>
 
@@ -152,10 +177,23 @@ function remove(acc) {
           <input v-model="form.email" placeholder="you@example.com" />
         </div>
 
-        <div class="form-row">
-          <label>
-            {{ form.provider === 'cloudflare' ? 'API Token / Key' : 'DNSPod Token（ID,Token）' }}
-          </label>
+        <template v-if="isESA">
+          <div class="form-row">
+            <label>AccessKey ID</label>
+            <input v-model="form.akId" placeholder="例如 LTAI5tAbCdEfGhIjKlMnOpQrSt" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="form-row">
+            <label>AccessKey Secret</label>
+            <input v-model="form.akSecret" type="password" :placeholder="editId !== null ? '留空表示不修改' : ''" autocomplete="new-password" spellcheck="false" />
+            <div class="hint">
+              到阿里云控制台 → RAM 访问控制 → 创建 AccessKey；并授予 ESA 权限（如 AliyunESAFullAccess）。
+              建议为 xDNS 单独创建 RAM 子账号，仅授予 ESA 权限。
+            </div>
+          </div>
+        </template>
+
+        <div class="form-row" v-else-if="form.provider !== 'aliyun-esa'">
+          <label>{{ form.provider === 'cloudflare' ? 'API Token / Key' : 'DNSPod Token（ID,Token）' }}</label>
           <input
             v-model="form.token"
             type="text"
@@ -167,12 +205,17 @@ function remove(acc) {
             必须带数字 ID。到 DNSPod 控制台 → 密钥管理 复制完整 Token，格式
             <code>123456,后面一串</code>，不要只填后半段，也不要用腾讯云 SecretId。
           </div>
-          <div v-if="formError" class="hint" style="color: var(--danger)">{{ formError }}</div>
         </div>
+
+        <div v-if="formError" class="hint" style="color: var(--danger)">{{ formError }}</div>
 
         <div class="modal-foot">
           <button @click="cancel">取消</button>
-          <button class="primary" :disabled="saving || (!form.token && editId === null)" @click="submit">
+          <button
+            class="primary"
+            :disabled="saving || (isESA ? (!form.akId.trim() || !form.akSecret.trim()) && editId === null : !form.token && editId === null)"
+            @click="submit"
+          >
             {{ saving ? '保存中…' : '保存' }}
           </button>
         </div>

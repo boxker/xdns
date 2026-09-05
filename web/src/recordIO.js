@@ -41,7 +41,7 @@ export function csvEscape(v) {
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-const CSV_HEADER = ['type', 'name', 'content', 'ttl', 'proxied', 'line', 'mx'];
+const CSV_HEADER = ['type', 'name', 'content', 'ttl', 'proxied', 'line', 'mx', 'remark'];
 
 // ---------- 解析入口 ----------
 
@@ -105,7 +105,7 @@ function normalizeRow(row) {
   mx = mx == null || mx === '' ? null : Number(mx);
   if (mx != null && !Number.isFinite(mx)) mx = null;
 
-  return { type, name, content, ttl, proxied: !!proxied, line: str(row.line) || '默认', mx };
+  return { type, name, content, ttl, proxied: !!proxied, line: str(row.line) || '默认', mx, remark: str(row.remark).slice(0, 200) };
 }
 
 function str(v) {
@@ -160,7 +160,7 @@ export function toZonesExport(zonesMap) {
 export function toCsvExport(records) {
   const head = CSV_HEADER.join(',');
   const rows = records.map((r) =>
-    [r.type, r.name, r.content, r.ttl ?? '', r.proxied ? 'true' : 'false', r.line ?? '', r.mx ?? '']
+    [r.type, r.name, r.content, r.ttl ?? '', r.proxied ? 'true' : 'false', r.line ?? '', r.mx ?? '', r.remark ?? '']
       .map(csvEscape)
       .join(',')
   );

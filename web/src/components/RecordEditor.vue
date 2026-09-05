@@ -2,7 +2,7 @@
 import { ref, reactive, watch, computed } from 'vue';
 
 const props = defineProps({
-  provider: { type: String, required: true },
+  provider: { type: String, required: true }, // cloudflare | aliyun-esa | dnspod
   domain: { type: String, default: '' }, // 当前域名/区域名
   record: { type: Object, default: null }, // null 表示新增
 });
@@ -28,10 +28,18 @@ const form = reactive({
   line: '默认',
   mx: 10,
   proxied: false,
+  remark: '',
 });
 
-const isCF = computed(() => props.provider === 'cloudflare');
+// DNSPod 常用线路（免费套餐可用；付费线路仍可手动输入）
+const LINE_OPTIONS = ['默认', '境内', '境外', '电信', '联通', '移动', '铁通', '教育网'];
+
+// CF 与 ESA 同为区域型：TTL 支持「自动」（1），A/AAAA/CNAME 可开代理
+const zoned = computed(() => props.provider === 'cloudflare' || props.provider === 'aliyun-esa');
+const isESA = computed(() => props.provider === 'aliyun-esa');
 const canProxy = computed(() => ['A', 'AAAA', 'CNAME'].includes(form.type));
+// ESA 的备注上限比其它服务商低（错误码按 50 字符判定）
+const remarkMax = computed(() => (isESA.value ? 50 : 200));
 
 function init() {
   const r = props.record;
@@ -41,8 +49,9 @@ function init() {
   form.line = r?.line || '默认';
   form.mx = r?.mx ?? 10;
   form.proxied = !!r?.proxied;
+  form.remark = r?.remark || '';
 
-  if (isCF.value) {
+  if (zoned.value) {
     form.ttlAuto = !r || r.ttl === 1 || r.ttl == null;
     form.ttl = r?.ttl && r.ttl !== 1 ? r.ttl : 1;
   } else {
@@ -64,8 +73,9 @@ function submit() {
     type: form.type,
     name: form.name.trim(),
     content: form.content.trim(),
+    remark: form.remark.trim(),
   };
-  if (isCF.value) {
+  if (zoned.value) {
     payload.ttl = form.ttlAuto ? 1 : Number(form.ttl) || 1;
     if (canProxy.value) payload.proxied = form.proxied;
     if (form.type === 'MX') payload.mx = Number(form.mx) || 10;
@@ -93,8 +103,7 @@ function submit() {
       <div class="form-row">
         <label>主机名</label>
         <input v-model="form.name" placeholder="例如 www.example.com" />
-        <div class="hint" v-if="isCF">完整主机名；根域名直接填 {{ domain || '主域名' }}</div>
-        <div class="hint" v-else>完整主机名；根域名直接填 {{ domain || '主域名' }}</div>
+        <div class="hint">完整主机名；根域名直接填 {{ domain || '主域名' }}</div>
       </div>
 
       <div class="form-row">
@@ -108,7 +117,7 @@ function submit() {
         <input v-model.number="form.mx" type="number" min="0" />
       </div>
 
-      <div class="form-row" v-if="isCF">
+      <div class="form-row" v-if="zoned">
         <label>TTL</label>
         <select v-model.number="form.ttl" :disabled="form.ttlAuto">
           <option v-for="o in CF_TTL_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
@@ -126,20 +135,33 @@ function submit() {
         <input v-model.number="form.ttl" type="number" min="1" />
       </div>
 
-      <div class="form-row" v-if="!isCF">
+      <div class="form-row" v-if="!zoned">
         <label>线路</label>
-        <input v-model="form.line" placeholder="默认" />
-        <div class="hint">常用：默认、电信、联通、移动</div>
+        <input v-model="form.line" list="line-options" placeholder="默认" />
+        <datalist id="line-options">
+          <option v-for="l in LINE_OPTIONS" :key="l" :value="l"></option>
+        </datalist>
+        <div class="hint">常用：默认、电信、联通、移动；付费套餐线路可手动输入</div>
       </div>
 
-      <div class="form-row" v-if="isCF && canProxy">
+      <div class="form-row">
+        <label>备注</label>
+        <input v-model="form.remark" :maxlength="remarkMax" placeholder="可选，如「官网主站」" />
+        <div class="hint" v-if="isESA">ESA 备注最长 {{ remarkMax }} 字符</div>
+      </div>
+
+      <div class="form-row" v-if="zoned && canProxy">
         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer">
           <span class="cdn-toggle" :class="{ on: form.proxied }" @click="form.proxied = !form.proxied">
             <span class="switch"></span>
           </span>
-          <span>启用 CDN（云朵代理）</span>
+          <span>{{ isESA ? '启用边缘加速（ESA 代理）' : '启用 CDN（云朵代理）' }}</span>
         </label>
-        <div class="hint">开启后流量经由 Cloudflare 加速与防护；关闭则为纯 DNS 解析</div>
+        <div class="hint">
+          {{ isESA
+            ? '开启后流量经由阿里云 ESA 边缘节点加速与防护；关闭则为纯 DNS 解析'
+            : '开启后流量经由 Cloudflare 加速与防护；关闭则为纯 DNS 解析' }}
+        </div>
       </div>
 
       <div class="modal-foot">

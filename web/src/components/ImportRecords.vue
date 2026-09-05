@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { parseRecordsText, readFileText } from '../recordIO.js';
 
 const props = defineProps({
-  provider: { type: String, required: true }, // cloudflare | dnspod
+  provider: { type: String, required: true }, // cloudflare | aliyun-esa | dnspod
   domain: { type: String, required: true },   // 当前域名（区域名）
 });
 const emit = defineEmits(['close', 'import']);
