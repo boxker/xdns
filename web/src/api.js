@@ -36,6 +36,8 @@ export const api = {
   createAccount: (a) => request('/accounts', { method: 'POST', body: JSON.stringify(a) }),
   updateAccount: (id, a) => request(`/accounts/${id}`, { method: 'PUT', body: JSON.stringify(a) }),
   deleteAccount: (id) => request(`/accounts/${id}`, { method: 'DELETE' }),
+  // 手动测试连接：后端按服务商拉一次最小列表验证凭证，只读探测、不落审计
+  testAccount: (id) => request(`/accounts/${id}/test`, { method: 'POST' }),
 
   // Cloudflare
   cfZones: (id) => request(`/cloudflare/${id}/zones`),

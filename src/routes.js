@@ -237,6 +237,24 @@ router.delete('/accounts/:id', wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// 手动测试连接：按服务商拉一次最小列表验证凭证有效性（不加 audit：只读探测，非显式变更）
+// 注意不能复用 getAccount(req)：它读的是 req.params.accountId（服务商级路由的参数名），
+// 本路由参数是 :id，传给它只会得到 NaN → 永远 404，因此与上方 PUT/DELETE 一致自行取值
+router.post('/accounts/:id/test', wrap(async (req, res) => {
+  const acc = store.getAccount(Number(req.params.id));
+  if (!acc) {
+    const e = new Error('账户不存在');
+    e.status = 404;
+    throw e;
+  }
+  // 凭证无效时服务商会抛错，由 wrap 统一转成 HTTP 错误响应；CF 的 listZones 兼作凭证校验
+  // （创建/编辑 CF 账户时后端本就不校验凭证，这里补齐一条手动验证通道）
+  if (acc.provider === 'dnspod') await dns.listDomains(acc);
+  else if (acc.provider === 'aliyun-esa') await esa.listSites(acc);
+  else await cf.listZones(acc);
+  res.json({ ok: true });
+}));
+
 // ---------- 审计日志 ----------
 router.get('/logs', wrap(async (req, res) => {
   res.json(store.listAuditLogs(req.query.limit));
