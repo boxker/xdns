@@ -170,3 +170,88 @@ test('改名：名称等价（短名与 FQDN）时走普通更新，不重建', 
   assert.ok(!actions.includes('CreateRecord'));
   assert.ok(!actions.includes('DeleteRecord'));
 });
+
+test('改名重建：源站配置与鉴权、业务场景原样带到新记录', async () => {
+  currentRecord = {
+    RecordId: 10, RecordType: 'CNAME', RecordName: 'cdn.example.com',
+    Ttl: 1, Proxied: true, BizName: 'api', Data: { Value: 'origin.example.com' },
+    RecordSourceType: 'OSS', HostPolicy: 'follow_origin_domain',
+    AuthConf: { AuthType: 'private_same_account' },
+  };
+  await applyRecordPatch(account, {
+    recordId: 10, siteId: 100, siteName: 'example.com',
+    patch: { name: 'cdn2.example.com' },
+  });
+  const create = calls.find((c) => c.action === 'CreateRecord');
+  assert.equal(create.params.RecordName, 'cdn2.example.com');
+  assert.equal(create.params.SourceType, 'OSS'); // 响应侧 RecordSourceType 映射回请求侧 SourceType
+  assert.equal(create.params.HostPolicy, 'follow_origin_domain');
+  assert.deepEqual(JSON.parse(create.params.AuthConf), { AuthType: 'private_same_account' });
+  // 已有业务场景时保持原值，不被默认值 web 覆盖
+  assert.equal(create.params.BizName, 'api');
+  assert.equal(create.params.Proxied, 'true');
+  assert.equal(JSON.parse(create.params.Data).Value, 'origin.example.com');
+});
+
+test('改名重建：SRV 的 Weight/Port 原样带到新记录', async () => {
+  currentRecord = {
+    RecordId: 11, RecordType: 'SRV', RecordName: '_sip._tcp.example.com',
+    Ttl: 1, Data: { Value: 'sipserver.example.com', Priority: 5, Weight: 10, Port: 5060 },
+  };
+  await applyRecordPatch(account, {
+    recordId: 11, siteId: 100, siteName: 'example.com',
+    patch: { name: '_sip2._tcp.example.com' },
+  });
+  const create = calls.find((c) => c.action === 'CreateRecord');
+  assert.equal(create.params.RecordName, '_sip2._tcp.example.com');
+  assert.deepEqual(JSON.parse(create.params.Data), {
+    Value: 'sipserver.example.com', Priority: 5, Weight: 10, Port: 5060,
+  });
+});
+
+test('改名重建：同时改 content/proxied 时新值生效且源站配置保留', async () => {
+  currentRecord = {
+    RecordId: 12, RecordType: 'CNAME', RecordName: 'old.example.com',
+    Ttl: 60, Proxied: false, Data: { Value: 'origin.example.com' },
+    RecordSourceType: 'OSS', HostPolicy: 'follow_origin_domain',
+    AuthConf: { AuthType: 'private_same_account' },
+  };
+  await applyRecordPatch(account, {
+    recordId: 12, siteId: 100, siteName: 'example.com',
+    patch: { name: 'new.example.com', content: 'neworigin.example.com', proxied: true },
+  });
+  const create = calls.find((c) => c.action === 'CreateRecord');
+  assert.equal(create.params.RecordName, 'new.example.com');
+  assert.equal(JSON.parse(create.params.Data).Value, 'neworigin.example.com');
+  assert.equal(create.params.Proxied, 'true');
+  // 原记录未配 BizName，开启加速时补默认业务场景
+  assert.equal(create.params.BizName, 'web');
+  assert.equal(create.params.SourceType, 'OSS');
+  assert.equal(create.params.HostPolicy, 'follow_origin_domain');
+  assert.deepEqual(JSON.parse(create.params.AuthConf), { AuthType: 'private_same_account' });
+  assert.equal(create.params.Ttl, '60'); // 未指定字段保持原值
+});
+
+test('回归：patch 不含 name 时走普通更新，不发 CreateRecord', async () => {
+  currentRecord = {
+    RecordId: 13, RecordType: 'CNAME', RecordName: 'cdn.example.com',
+    Ttl: 1, Proxied: true, BizName: 'api', Data: { Value: 'origin.example.com' },
+    RecordSourceType: 'OSS', HostPolicy: 'follow_origin_domain',
+    AuthConf: { AuthType: 'private_same_account' },
+  };
+  await applyRecordPatch(account, {
+    recordId: 13, siteId: 100, siteName: 'example.com',
+    patch: { ttl: 120 },
+  });
+  const actions = calls.map((c) => c.action);
+  assert.ok(actions.includes('UpdateRecord'));
+  assert.ok(!actions.includes('CreateRecord'));
+  assert.ok(!actions.includes('DeleteRecord'));
+  const { params } = updateCall();
+  assert.equal(params.Ttl, '120');
+  assert.equal(params.SourceType, 'OSS');
+  assert.equal(params.HostPolicy, 'follow_origin_domain');
+  assert.deepEqual(JSON.parse(params.AuthConf), { AuthType: 'private_same_account' });
+  assert.equal(params.BizName, 'api');
+  assert.equal(params.Proxied, 'true');
+});

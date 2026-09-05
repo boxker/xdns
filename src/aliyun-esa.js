@@ -296,10 +296,11 @@ function toUpdateParams(r) {
   return params;
 }
 
-// 合并式更新：先回读记录，应用局部变更后全量提交（不依赖上游局部更新语义）
-// 注意 UpdateRecord 没有 RecordName 参数，改名需删除后重建，由调用方处理
-export async function updateRecordFields(account, recordId, patch = {}) {
-  const cur = await getRecord(account, recordId);
+// 在回读到的原始记录上应用 common 风格 patch，返回合并后的全量请求参数（不含 RecordName）
+// 单独成函数的原因：改名重建与合并更新必须共用同一条合并链路——历史上改名走
+// toCommon→fromCommon 往返，fromCommon 不携带 SourceType/HostPolicy/AuthConf/BizName
+// 与 SRV 的 Weight/Port，导致改名后这些配置被清空；两份字段清单必然漂移，收敛为一份
+function applyPatchToParams(cur, patch = {}) {
   const merged = toUpdateParams(cur);
   if (patch.type != null) merged.Type = patch.type;
   if (patch.ttl != null) merged.Ttl = Number(patch.ttl);
@@ -329,6 +330,14 @@ export async function updateRecordFields(account, recordId, patch = {}) {
   // 开启加速必须带业务场景，否则上游报错
   if (merged.Proxied && !merged.BizName) merged.BizName = DEFAULT_BIZ_NAME;
   if (!merged.Proxied) delete merged.BizName;
+  return merged;
+}
+
+// 合并式更新：先回读记录，应用局部变更后全量提交（不依赖上游局部更新语义）
+// 注意 UpdateRecord 没有 RecordName 参数，改名需删除后重建，由调用方处理
+export async function updateRecordFields(account, recordId, patch = {}) {
+  const cur = await getRecord(account, recordId);
+  const merged = applyPatchToParams(cur, patch);
   return updateRecord(account, recordId, merged);
 }
 
@@ -348,20 +357,10 @@ export async function applyRecordPatch(account, { recordId, siteId, siteName, pa
 
   if (nextName === curName) return updateRecordFields(account, recordId, patch);
 
-  // 以当前记录为基础叠加变更，重建为一条新记录
-  const base = toCommon(cur);
-  const createParams = fromCommon(
-    {
-      type: patch.type ?? base.type,
-      name: nextName,
-      content: patch.content ?? base.content,
-      ttl: patch.ttl ?? base.ttl,
-      proxied: patch.proxied ?? base.proxied,
-      mx: patch.mx ?? base.mx,
-      remark: patch.remark ?? base.remark,
-    },
-    siteName
-  );
+  // 以当前记录为底、叠加 patch 后重建新记录：与合并更新共用 applyPatchToParams，
+  // 保证 SourceType/HostPolicy/AuthConf/BizName 与 SRV Weight/Port 在改名时不丢失
+  // （CreateRecord 必填 RecordName，而合并参数本身不含该字段，在此补上）
+  const createParams = { ...applyPatchToParams(cur, patch), RecordName: nextName };
   const newId = await createRecord(account, siteId, createParams);
   if (!newId) throw badRequest('ESA 改名失败：新记录创建后未返回记录 ID，请刷新列表确认');
   try {
