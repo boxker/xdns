@@ -147,6 +147,10 @@ const isESA = computed(() => provider.value === 'aliyun-esa');
 const zoned = computed(() => isCF.value || isESA.value);
 const canProxyType = (t) => ['A', 'AAAA', 'CNAME'].includes(t);
 const isRecordOn = (r) => r.status === 'enabled' || r.status === 'enable';
+// ESA 站点加速 CNAME：仅 CNAME 接入需要展示（NS 接入不走 CNAME 解析，避免误导）
+function showSiteCname(item) {
+  return !!item?.cname && item.accessType !== 'NS';
+}
 // 当前域名下已开启加速的记录数（页头统计）
 const proxiedCount = computed(() => records.value.filter((r) => r.proxied && canProxyType(r.type)).length);
 
@@ -317,13 +321,22 @@ async function checkAllRecords() {
 }
 
 // ---- 复制 / 日志 ----
-async function copyContent(r) {
+async function copyText(text, tip = '已复制') {
   try {
-    await navigator.clipboard.writeText(r.content);
-    toast('记录值已复制');
+    await navigator.clipboard.writeText(text);
+    toast(tip);
   } catch {
     toast('复制失败，请手动选择复制', 'error');
   }
+}
+
+function copyContent(r) {
+  return copyText(r.content, '记录值已复制');
+}
+
+// ESA CNAME 接入站点的加速域名：复制后去原 DNS 服务商添加 CNAME 解析
+function copySiteCname(item) {
+  return copyText(item.cname, '加速 CNAME 已复制');
 }
 
 async function openLogs() {
@@ -907,6 +920,16 @@ onMounted(() => {
             >
               <span class="zone-name">{{ item.name }}</span>
               <span class="zone-dot" :class="{ ok: item.status === 'active' || item.status === 'enable' }"></span>
+              <!-- ESA CNAME 接入站点：展示分配的加速 CNAME，点击复制（阻止冒泡，避免误切换站点） -->
+              <button
+                v-if="isESA && showSiteCname(item)"
+                class="zone-cname"
+                :title="'CNAME 接入的加速域名，点击复制去原 DNS 服务商添加解析：' + item.cname"
+                @click.stop="copySiteCname(item)"
+              >
+                <svg class="icon" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <span class="zone-cname-text">{{ item.cname }}</span>
+              </button>
             </div>
             <div v-if="!filteredItems.length && domainSearch" class="empty" style="padding: 20px"><div style="font-size: 12px">无匹配结果</div></div>
           </div>

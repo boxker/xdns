@@ -392,12 +392,7 @@ function getEsaSite(req) {
 router.get('/aliyun-esa/:accountId/sites', wrap(async (req, res) => {
   const acc = getAccount(req);
   const sites = await esa.listSites(acc);
-  res.json(sites.map((s) => ({
-    id: s.SiteId ?? s.siteId,
-    name: s.SiteName ?? s.siteName,
-    status: s.Status ?? s.status,
-    grade: s.PlanName ?? s.planName ?? '',
-  })));
+  res.json(sites.map(esa.toCommonSite));
 }));
 
 router.get('/aliyun-esa/:accountId/sites/:siteId/records', wrap(async (req, res) => {

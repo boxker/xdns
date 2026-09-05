@@ -188,6 +188,22 @@ export async function listSites(account) {
   return all;
 }
 
+// 站点 -> 统一字段模型（路由层直接透出）
+// CnameZone / AccessType 随 ListSites 一并返回（官方 API 文档 api-esa-2024-09-10 ListSites 响应参数）：
+// CnameZone 为站点的加速 CNAME 域名（CNAME 接入时记录需指向的 CNAME），无需对每个站点再单独调接口
+export function toCommonSite(s) {
+  return {
+    id: String(pick(s, 'SiteId', 'siteId') ?? ''),
+    name: pick(s, 'SiteName', 'siteName') || '',
+    status: pick(s, 'Status', 'status') || '',
+    grade: pick(s, 'PlanName', 'planName') || '',
+    // NS / CNAME 接入方式：仅 CNAME 接入的站点需要展示加速 CNAME
+    accessType: pick(s, 'AccessType', 'accessType') || '',
+    // CNAME 接入的加速域名，用户需拿它去原 DNS 服务商添加 CNAME 解析
+    cname: pick(s, 'CnameZone', 'cnameZone') || '',
+  };
+}
+
 // ---------- 记录 ----------
 export async function listRecords(account, siteId) {
   const all = [];

@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   normalizeToken, isValidToken, parseCredentials, toCommon, fromCommon, parseCaaContent,
+  listSites, toCommonSite,
 } from '../src/aliyun-esa.js';
 
 test('ESA 凭证规范化与校验', () => {
@@ -110,4 +111,58 @@ test('ESA toCommon：SRV/URI 的优先级也映射到 mx', () => {
     Data: { Value: 'sip.example.com', Priority: 5, Weight: 10, Port: 5060 },
   });
   assert.equal(srv.mx, 5);
+});
+
+test('ESA toCommonSite：带出 CNAME 接入的加速域名与接入方式', () => {
+  const s = toCommonSite({
+    SiteId: 1234567890123, SiteName: 'example.com', Status: 'active', PlanName: 'plan-1686****',
+    AccessType: 'CNAME', CnameZone: 'example.com.cnamezone.com',
+  });
+  assert.equal(s.id, '1234567890123');
+  assert.equal(s.name, 'example.com');
+  assert.equal(s.status, 'active');
+  assert.equal(s.grade, 'plan-1686****');
+  assert.equal(s.accessType, 'CNAME'); // 接入方式：NS / CNAME
+  assert.equal(s.cname, 'example.com.cnamezone.com'); // CNAME 接入时需指向的加速域名
+});
+
+test('ESA toCommonSite：字段小写风格兼容与缺省容错', () => {
+  const s = toCommonSite({ siteId: 7, siteName: 'a.com', accessType: 'NS' });
+  assert.equal(s.id, '7');
+  assert.equal(s.name, 'a.com');
+  assert.equal(s.accessType, 'NS');
+  assert.equal(s.cname, ''); // 上游未返回 CnameZone 时降级为空串，不报错
+  assert.equal(s.status, '');
+  assert.equal(s.grade, '');
+});
+
+test('ESA listSites：加速 CNAME 随 ListSites 一并返回，无需逐站点调用', async () => {
+  const realFetch = globalThis.fetch;
+  const actions = [];
+  globalThis.fetch = async (url, opts = {}) => {
+    actions.push(opts.headers['x-acs-action']);
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({
+        TotalCount: 2,
+        Sites: [
+          { SiteId: 1, SiteName: 'a.com', Status: 'active', AccessType: 'CNAME', CnameZone: 'a.com.cnamezone.com' },
+          { SiteId: 2, SiteName: 'b.com', Status: 'active', AccessType: 'NS', CnameZone: 'b.com.cnamezone.com' },
+        ],
+      }),
+    };
+  };
+  try {
+    const sites = await listSites({ token: 'LTAI5tTestAccessKeyId,testAccessKeySecret' });
+    assert.equal(sites.length, 2);
+    // 站点对象原生携带 CnameZone / AccessType，路由层可直接归一透出
+    assert.equal(toCommonSite(sites[0]).cname, 'a.com.cnamezone.com');
+    assert.equal(toCommonSite(sites[0]).accessType, 'CNAME');
+    assert.equal(toCommonSite(sites[1]).accessType, 'NS');
+    // CNAME 信息随列表返回，不存在额外的获取接口（也就没有单站点失败拖垮列表的问题）
+    assert.deepEqual([...new Set(actions)], ['ListSites']);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });

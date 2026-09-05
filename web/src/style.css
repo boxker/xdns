@@ -295,9 +295,10 @@ svg.icon { width: 16px; height: 16px; flex-shrink: 0; stroke: currentColor; fill
 .zone-item {
   position: relative;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 2px 8px;
   padding: 8px 12px;
   border-radius: 9px;
   cursor: pointer;
@@ -306,9 +307,31 @@ svg.icon { width: 16px; height: 16px; flex-shrink: 0; stroke: currentColor; fill
 }
 .zone-item:hover { background: var(--hover); color: var(--text); }
 .zone-item.active { background: var(--primary-weak); color: var(--primary); font-weight: 600; }
-.zone-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.zone-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .zone-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--switch-off); flex-shrink: 0; transition: background 0.2s; }
 .zone-dot.ok { background: var(--green); box-shadow: 0 0 0 3px rgba(24, 165, 106, 0.16); }
+/* ESA CNAME 接入站点：第二行展示分配的加速 CNAME，点击复制 */
+.zone-cname {
+  flex-basis: 100%;
+  max-width: 100%;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-3);
+  cursor: copy;
+  text-align: left;
+  justify-content: flex-start;
+}
+.zone-cname:hover { background: none; color: var(--primary); }
+.zone-cname .icon { width: 11px; height: 11px; }
+.zone-cname-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---------- 主内容 ---------- */
 .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
@@ -871,8 +894,10 @@ tbody tr.selected td { background: var(--selected-row); }
   .aside-head { display: none; }
   .aside-search { display: none; }
   .zone-list { display: flex; overflow-x: auto; overflow-y: hidden; padding: 8px 10px; }
-  .zone-item { flex: 0 0 auto; }
-  .zone-item .zone-name { max-width: 40vw; }
+  .zone-item { flex: 0 0 auto; flex-direction: column; align-items: flex-start; gap: 2px; }
+  .zone-item .zone-name { max-width: 40vw; flex: none; }
+  /* 横向滑动条里 CNAME 独占一行，同样可点复制 */
+  .zone-cname { flex-basis: auto; max-width: 60vw; }
 
   /* 页头：操作行可换行，筛选行搜索框独占一行 */
   .page-head {
