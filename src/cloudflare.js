@@ -14,12 +14,30 @@ function cfHeaders(account) {
 }
 
 async function cfRequest(account, path, { method = 'GET', body } = {}) {
-  const res = await fetch(CF_BASE + path, {
-    method,
-    headers: cfHeaders(account),
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const data = await res.json();
+  let res;
+  try {
+    res = await fetch(CF_BASE + path, {
+      method,
+      headers: cfHeaders(account),
+      body: body ? JSON.stringify(body) : undefined,
+      // 国内环境访问 CF 接口常被墙/被代理挂死,带超时避免请求无限等待拖垮前端
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (e) {
+    // 网络层异常统一包装成中文并返回 502,避免英文堆栈直接透给用户(对齐 dnspod.js 风格)
+    const err = new Error(`无法连接 Cloudflare:${e.name === 'TimeoutError' ? '请求超时' : e.message}`);
+    err.status = 502;
+    throw err;
+  }
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    // 被墙/代理返回 HTML 网关页时 JSON 解析必失败,同样给中文提示而非 Unexpected token
+    const err = new Error(`Cloudflare 返回异常(HTTP ${res.status})`);
+    err.status = 502;
+    throw err;
+  }
   if (!data.success) {
     const msg = (data.errors || []).map((e) => e.message).join('; ') || `Cloudflare HTTP ${res.status}`;
     const err = new Error(msg);

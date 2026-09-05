@@ -223,6 +223,8 @@ router.put('/accounts/:id', wrap(async (req, res) => {
     await esa.listSites({ ...existing, ...patch });
   }
   const updated = store.updateAccount(Number(req.params.id), patch);
+  // 编辑账户是显式变更操作,必须与 create/delete 一样落审计,否则日志链路缺一环
+  audit(req, 'account_update', `修改账户「${updated.name}」(${updated.provider})${patch.token ? ' 及凭证' : ''}`);
   res.json(publicAccount(updated));
 }));
 
