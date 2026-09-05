@@ -37,6 +37,10 @@ jobs:
       - name: 检出代码
         run: git clone --depth 1 "http://${{ github.actor }}:${{ github.token }}@gitea:3000/${GITHUB_REPOSITORY}.git" .
 
+      # 测试只依赖 node 内置模块（node --test），无需 npm ci 拉依赖
+      - name: 运行单元测试
+        run: npm test
+
       - name: 登录镜像仓库
         run: echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login "$REGISTRY" -u "${{ secrets.REGISTRY_USERNAME || 'admin' }}" --password-stdin
 
