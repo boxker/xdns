@@ -40,11 +40,17 @@ export function validateCommonRecord(r, { partial = false, provider = '' } = {})
     if (!v) throw bad('记录值不能为空');
     if (t === 'A' && net.isIP(v) !== 4) throw bad(`A 记录的值必须是 IPv4 地址，当前为：${v}`);
     if (t === 'AAAA' && net.isIP(v) !== 6) throw bad(`AAAA 记录的值必须是 IPv6 地址，当前为：${v}`);
-    if (t === 'CNAME' || t === 'NS' || t === 'MX') {
+    // PTR 的值是主机域名（反向解析指向），与 CNAME/NS 的目标域名规则一致，复用同一段校验
+    if (t === 'CNAME' || t === 'NS' || t === 'MX' || t === 'PTR') {
       const target = v.replace(/\s.*$/, '');
       if (net.isIP(target) || !isValidHostname(target)) {
         throw bad(`${t} 记录的值必须是域名（${t === 'MX' ? '如 mx.example.com' : '如 target.example.com'}），不能是 IP，当前为：${v}`);
       }
+    }
+    // SRV 的值是「优先级 权重 端口 目标」四段空格分隔，前端在写死前拦截明显格式错误，
+    // 避免放行到上游才报难懂的英文错误
+    if (t === 'SRV' && !/^\d+ \d+ \d+ \S+$/.test(v)) {
+      throw bad(`SRV 记录值格式应为「优先级 权重 端口 目标」，例如：0 5 5060 sip.example.com，当前为：${v}`);
     }
     if (t === 'CAA' && !/^\s*\d+\s+(issue|issuewild|iodef)\s+"[^"]*"\s*(;.*)?$/i.test(v)) {
       throw bad(`CAA 记录的值格式应为「标志 标签 "值"」，例如：0 issue "letsencrypt.org"，当前为：${v}`);

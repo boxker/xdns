@@ -37,10 +37,24 @@ test('非法类型 / 缺字段进入 errors', () => {
   assert.equal(errors.length, 2);
 });
 
-test('导出 CSV 含 remark 列且可再导入（往返）', () => {
-  const recs = [{ type: 'A', name: 'www', content: '1.1.1.1', ttl: 600, proxied: false, line: '默认', mx: null, remark: '官网' }];
+test('导出 CSV 带 BOM 且往返解析无损（Excel 中文不乱码）', () => {
+  const recs = [{ type: 'A', name: 'www', content: '1.2.3.4', ttl: 600, proxied: false, line: '默认', mx: null, remark: '官网' }];
   const csv = toCsvExport(recs);
-  assert.ok(csv.startsWith('type,name,content,ttl,proxied,line,mx,remark'));
-  const { records } = parseRecordsText(csv);
-  assert.equal(records[0].remark, '官网');
+  // BOM 前缀保证 Excel 双击打开时按 UTF-8 识别、中文备注不乱码
+  assert.ok(csv.startsWith('\uFEFFtype,name,content,ttl,proxied,line,mx,remark'));
+  // 导出内容再走 parseRecordsText 应无损（隐含覆盖 BOM 容错：表头首列不能识别成 \uFEFFtype）
+  const { records, errors } = parseRecordsText(csv);
+  assert.equal(errors.length, 0);
+  assert.deepEqual(records[0], {
+    type: 'A', name: 'www', content: '1.2.3.4', ttl: 600,
+    proxied: false, line: '默认', mx: null, remark: '官网', _dup: false,
+  });
+});
+
+test('带 BOM 前缀的 CSV 文本能正常解析出表头', () => {
+  const csv = '\uFEFFtype,name,content\nA,www,1.1.1.1\n';
+  const { records, errors } = parseRecordsText(csv);
+  assert.equal(errors.length, 0);
+  assert.equal(records.length, 1);
+  assert.equal(records[0].type, 'A');
 });

@@ -8,7 +8,8 @@ const props = defineProps({
 });
 const emit = defineEmits(['save', 'close']);
 
-const TYPES = ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'CAA'];
+// SRV/PTR 补进可选类型：recordIO 与服务端校验均早已支持，缺的只是编辑入口
+const TYPES = ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'SRV', 'PTR', 'CAA'];
 const CF_TTL_OPTIONS = [
   { label: '自动', value: 1 },
   { label: '60 秒', value: 60 },
@@ -110,6 +111,8 @@ function submit() {
         <label>记录值</label>
         <textarea v-if="form.type === 'TXT'" v-model="form.content" placeholder="记录内容"></textarea>
         <input v-else v-model="form.content" placeholder="记录值，如 IP 地址 / 目标域名" />
+        <!-- SRV 是四段空格分隔的特殊格式，不给样例用户很难猜对，服务端也按此格式校验 -->
+        <div v-if="form.type === 'SRV'" class="hint">格式：优先级 权重 端口 目标，如 0 5 5060 sip.example.com</div>
       </div>
 
       <div class="form-row" v-if="form.type === 'MX'">

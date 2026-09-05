@@ -5,6 +5,9 @@ import { parseRecordsText, readFileText } from '../recordIO.js';
 const props = defineProps({
   provider: { type: String, required: true }, // cloudflare | aliyun-esa | dnspod
   domain: { type: String, required: true },   // 当前域名（区域名）
+  // 当前域已加载的记录列表：传入后查重才不会与线上记录脱节，
+  // 否则重复导入会绕过 _dup 标记、真实建出重复记录
+  existingRecords: { type: Array, default: () => [] },
 });
 const emit = defineEmits(['close', 'import']);
 
@@ -56,7 +59,9 @@ async function handleFile(file) {
   fileName.value = file.name;
   try {
     const text = await readFileText(file);
-    const { records: recs, errors: errs } = parseRecordsText(text, []);
+    // 把父组件传入的线上已有记录一并交给查重（dupKey 为 type|name|content，
+    // common 记录数组可直接使用），避免重复导入真实建出重复记录
+    const { records: recs, errors: errs } = parseRecordsText(text, props.existingRecords);
     records.value = recs;
     errors.value = errs;
     state.value = 'preview';

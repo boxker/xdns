@@ -49,7 +49,9 @@ const CSV_HEADER = ['type', 'name', 'content', 'ttl', 'proxied', 'line', 'mx', '
 // 每条 record: { type, name, content, ttl, proxied, line, mx, _dup }
 // _dup=true 表示与当前已有记录重复（type+name+content 相同），UI 会置灰
 export function parseRecordsText(text, existing = []) {
-  const trimmed = String(text || '').trim();
+  // 先剥掉开头的 UTF-8 BOM 再 trim：本工具导出的 CSV 自带 BOM（见 toCsvExport），
+  // 不处理的话表头首列会变成 \uFEFFtype，导致列识别失败、导出文件无法再导入
+  const trimmed = String(text || '').replace(/^\uFEFF/, '').trim();
   if (!trimmed) throw new Error('文件内容为空');
 
   let rawList;
@@ -164,7 +166,9 @@ export function toCsvExport(records) {
       .map(csvEscape)
       .join(',')
   );
-  return [head, ...rows].join('\n');
+  // 前置 UTF-8 BOM：Excel 双击打开 CSV 时靠它识别 UTF-8，否则中文备注会乱码；
+  // 导入侧 parseRecordsText 已兼容剥掉该前缀
+  return '\uFEFF' + [head, ...rows].join('\n');
 }
 
 // ---------- 下载 / 读文件 ----------

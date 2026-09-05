@@ -75,6 +75,18 @@ test('类型与 proxied 格式', () => {
   fails({ type: 'A', name: 'a.com', content: '1.2.3.4', proxied: 'yes' }, undefined, '布尔');
 });
 
+test('SRV 记录值必须为四段格式（优先级 权重 端口 目标）', () => {
+  ok({ type: 'SRV', name: '_sip._tcp.example.com', content: '0 5 5060 sip.example.com', ttl: 600 });
+  fails({ type: 'SRV', name: '_sip._tcp.example.com', content: '0 5 5060' }, undefined, 'SRV'); // 缺目标段
+  fails({ type: 'SRV', name: '_sip._tcp.example.com', content: '0 5 abc sip.example.com' }, undefined, 'SRV'); // 端口非数字
+});
+
+test('PTR 记录值必须是域名', () => {
+  ok({ type: 'PTR', name: '4.3.2.1.in-addr.arpa', content: 'host.example.com', ttl: 600 });
+  fails({ type: 'PTR', name: '4.3.2.1.in-addr.arpa', content: '1.2.3.4' }, undefined, '域名'); // 不能是 IP
+  fails({ type: 'PTR', name: '4.3.2.1.in-addr.arpa', content: '-bad.com' }, undefined, '域名');
+});
+
 test('线路', () => {
   ok({ type: 'A', name: 'a.com', content: '1.2.3.4', line: '电信' });
   fails({ type: 'A', name: 'a.com', content: '1.2.3.4', line: '  ' }, undefined, '线路');
