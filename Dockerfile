@@ -1,5 +1,5 @@
 # xDNS · DNS 管理平台
-# 多阶段构建：Stage 1 构建前端，Stage 2 仅生产依赖 + 构建产物
+# 多阶段构建：Stage 1 构建前端（图标 → vite → Service Worker），Stage 2 仅生产依赖 + 构建产物
 FROM node:22-alpine AS build
 
 WORKDIR /app

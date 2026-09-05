@@ -2,6 +2,7 @@ services:
   xdns:
     build: .
     image: xdns:latest
+    pull_policy: build # 每次 docker compose up -d 自动重建镜像，代码改动直接生效
     container_name: xdns
     restart: unless-stopped
     ports:
@@ -14,3 +15,8 @@ services:
     volumes:
       # SQLite 数据库持久化：accounts / users / sessions 都在这里
       - ./data:/app/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M

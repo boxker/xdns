@@ -1,0 +1,2 @@
+# shell 脚本必须保持 LF，否则容器内会报 bad interpreter / \r 命令不存在
+*.sh text eol=lf
