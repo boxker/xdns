@@ -134,7 +134,7 @@ export async function setStatus(account, domain, recordId, status) {
 }
 
 function buildParams(domain, record) {
-  return {
+  const params = {
     domain,
     sub_domain: record.name,
     record_type: record.type,
@@ -143,6 +143,8 @@ function buildParams(domain, record) {
     ttl: record.ttl,
     mx: record.type === 'MX' ? (record.mx ?? 10) : null,
   };
+  if (record.remark != null && String(record.remark).trim()) params.remark = String(record.remark).trim().slice(0, 200);
+  return params;
 }
 
 export function toCommon(r, domain) {
@@ -177,5 +179,6 @@ export function fromCommon(r, domain) {
     ttl: r.ttl != null && r.ttl !== '' ? Number(r.ttl) : 600,
     line: r.line || '默认',
     mx: r.mx ?? null,
+    remark: r.remark ?? '',
   };
 }

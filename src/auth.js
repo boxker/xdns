@@ -26,13 +26,13 @@ export function createSession(userId) {
   return token;
 }
 
-export function sessionCookie(token) {
+export function sessionCookie(token, { secure = false } = {}) {
   const maxAge = Math.floor(SESSION_TTL_MS / 1000);
-  return `${COOKIE_NAME}=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}`;
+  return `${COOKIE_NAME}=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
 }
 
-export function clearCookie() {
-  return `${COOKIE_NAME}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`;
+export function clearCookie({ secure = false } = {}) {
+  return `${COOKIE_NAME}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0${secure ? '; Secure' : ''}`;
 }
 
 export function parseCookies(header) {

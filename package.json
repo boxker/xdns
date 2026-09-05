@@ -1,11 +1,12 @@
 {
   "name": "xdns",
   "version": "1.0.0",
-  "description": "DNS Web 管理平台 - 统一管理 Cloudflare 与 DNSPod 记录",
+  "description": "DNS Web 管理平台 - 统一管理 Cloudflare、DNSPod 与阿里云 ESA 记录",
   "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "test": "node --test",
     "build": "cd web && npm install && npm run build"
   },
   "dependencies": {

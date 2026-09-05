@@ -97,9 +97,13 @@ export function toCommon(r) {
 }
 
 export function fromCommon(r) {
-  const body = { type: r.type, name: r.name, content: r.content };
+  const body = {};
+  if (r.type != null) body.type = r.type;
+  if (r.name != null) body.name = r.name;
+  if (r.content != null && r.content !== '') body.content = r.content;
   if (r.ttl != null && r.ttl !== '') body.ttl = Number(r.ttl);
   if (r.proxied != null) body.proxied = !!r.proxied;
   if (r.type === 'MX' && r.mx != null) body.priority = Number(r.mx);
+  if (r.remark != null && String(r.remark).trim()) body.comment = String(r.remark).trim();
   return body;
 }

@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { encrypt, decrypt } from './crypto.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(__dirname, '..', 'data');
@@ -47,17 +48,19 @@ db.exec(`
 `);
 
 export function listAccounts() {
-  return db.prepare('SELECT id, provider, name, auth_type, email, token FROM accounts ORDER BY id').all();
+  const rows = db.prepare('SELECT id, provider, name, auth_type, email, token FROM accounts ORDER BY id').all();
+  return rows.map((r) => ({ ...r, token: decrypt(r.token) }));
 }
 
 export function getAccount(id) {
-  return db.prepare('SELECT id, provider, name, auth_type, email, token FROM accounts WHERE id = ?').get(id);
+  const row = db.prepare('SELECT id, provider, name, auth_type, email, token FROM accounts WHERE id = ?').get(id);
+  return row ? { ...row, token: decrypt(row.token) } : undefined;
 }
 
 export function createAccount({ provider, name, auth_type = 'token', token, email = '' }) {
   const r = db
     .prepare('INSERT INTO accounts (provider, name, auth_type, token, email) VALUES (?,?,?,?,?)')
-    .run(provider, name, auth_type, token, email ?? '');
+    .run(provider, name, auth_type, encrypt(token), email ?? '');
   return getAccount(Number(r.lastInsertRowid));
 }
 
@@ -70,7 +73,7 @@ export function updateAccount(id, fields) {
   const token = fields.token ?? acc.token;
   const email = fields.email ?? acc.email ?? '';
   db.prepare('UPDATE accounts SET provider=?, name=?, auth_type=?, token=?, email=? WHERE id=?')
-    .run(provider, name, auth_type, token, email, id);
+    .run(provider, name, auth_type, encrypt(token), email, id);
   return getAccount(id);
 }
 

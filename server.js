@@ -12,6 +12,11 @@ const app = express();
 
 app.use(express.json());
 
+// 反向代理下的真实客户端 IP：
+//   默认仅信任本机回环代理（nginx 同机部署）；跨容器/远程代理设 XDNS_TRUST_PROXY=1
+// 开启后 req.ip / req.secure 会依据 X-Forwarded-For / X-Forwarded-Proto 解析
+app.set('trust proxy', process.env.XDNS_TRUST_PROXY === '1' ? true : 'loopback');
+
 // 健康检查（无需登录）
 app.get('/api/health', (req, res) => res.json({ ok: true, name: 'xdns' }));
 
