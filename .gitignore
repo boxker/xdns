@@ -10,3 +10,7 @@ data/
 
 # PWA 图标为构建时生成
 web/public/icons/
+
+# 本机部署覆盖(docker compose 自动加载,含机器相关路径)
+docker-compose.override.yml
+.env
